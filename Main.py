@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from data_utils import load_and_preprocess_iris, reshape_for_rnn
 from rnn_model import RNNModel
 from lstm_model import LSTMModel
@@ -15,6 +16,31 @@ def print_metrics(model_name, metrics):
     print(f"  Precision: {metrics['precision']:.4f}")
     print(f"  Recall:    {metrics['recall']:.4f}")
     print(f"  F1-Score:  {metrics['f1']:.4f}")
+
+
+def plot_metrics(model_names, metrics_list, filename='results.png'):
+    """Plot bar chart for model metrics."""
+    x = np.arange(len(model_names))
+    width = 0.2
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    metrics_keys = ['accuracy', 'precision', 'recall', 'f1']
+    
+    for i, key in enumerate(metrics_keys):
+        values = [m[key] for m in metrics_list]
+        ax.bar(x + i*width, values, width, label=key.capitalize())
+    
+    ax.set_xlabel('Models')
+    ax.set_ylabel('Scores')
+    ax.set_title('Model Performance Comparison')
+    ax.set_xticks(x + width * 1.5)
+    ax.set_xticklabels(model_names)
+    ax.legend()
+    ax.set_ylim(0, 1)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"Graph saved as {filename}")
 
 
 def main():
@@ -100,6 +126,14 @@ def main():
     best_accuracy = summary_df['Accuracy'].max()
     print(f"\nBest Model: {best_model} with Accuracy: {best_accuracy:.4f}")
     
+    # ==================== PLOT RESULTS ====================
+    print("\n" + "="*60)
+    print("Generating plots...")
+    print("="*60)
+    
+    all_metrics = [rnn_metrics, lstm_metrics, gan_metrics]
+    plot_metrics(['RNN', 'LSTM', 'GAN Classifier'], all_metrics)
+    
     # ==================== SAVE MODELS ====================
     print("\n" + "="*60)
     print("Saving models...")
@@ -116,3 +150,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
