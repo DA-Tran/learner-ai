@@ -2,37 +2,50 @@
 
 import numpy as np
 import pandas as pd
-from data_utils import load_and_preprocess_iris, reshape_for_rnn
+from data_utils import load_and_preprocess_dataset, reshape_for_rnn
 from rnn_model import RNNModel
 from lstm_model import LSTMModel
 from gan_model import GAN, GANClassifier
 from evaluation import print_metrics, plot_confusion_matrix, plot_learning_curves, plot_metrics
 from cross_validation import get_cv_scores
+import os
+import tensorflow as tf
 
+# Suppress all warnings at startup
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+tf.random.set_seed(42)
+tf.config.optimizer.set_jit(False)
 
 def main():
     """Main training pipeline."""
     
+    dataset_choice = input("Choose dataset (iris/heart/breast/youtube): ").strip().lower()
+    if dataset_choice not in ['iris', 'heart', 'breast', 'youtube']:
+        print("Invalid choice, defaulting to 'iris'")
+        dataset_choice = 'iris'
+    
     print("="*60)
-    print("Loading and preprocessing data...")
+    print(f"Loading {dataset_choice.upper()} dataset...")
     print("="*60)
     
-    # Load data
-    X, X_test, y, y_test, scaler, encoder = load_and_preprocess_iris()
-    X_rnn, X_test_rnn = reshape_for_rnn(X, X_test)
+    # Load selected dataset
+    X_train, X_test, y_train, y_test, scaler, encoder = load_and_preprocess_dataset(dataset_choice)
+    X_rnn_train, X_rnn_test = reshape_for_rnn(X_train, X_test)
     
-    print(f"Full dataset shape: {X.shape}")
+    print(f"Full dataset shape: {X_train.shape}")
     
     # ==================== CROSS-VALIDATION ====================
     print("\n" + "="*60)
     print("CROSS-VALIDATION (5-fold)")
     print("="*60)
     
-    rnn_cv = get_cv_scores(RNNModel, X_rnn, y, input_shape=(1, 4), cv_folds=5)
-    print(f"RNN CV: {rnn_cv['mean_accuracy']:.4f} (+/- {rnn_cv['std_accuracy']:.4f})")
+    input_shape = (1, X_train.shape[1])
+    rnn_cv = get_cv_scores(RNNModel, X_rnn_train, y_train, input_shape=input_shape)
+    print(f"{dataset_choice.upper()} RNN CV: {rnn_cv['mean_accuracy']:.4f} (+/- {rnn_cv['std_accuracy']:.4f})")
     
-    lstm_cv = get_cv_scores(LSTMModel, X_rnn, y, input_shape=(1, 4), cv_folds=5)
-    print(f"LSTM CV: {lstm_cv['mean_accuracy']:.4f} (+/- {lstm_cv['std_accuracy']:.4f})")
+    lstm_cv = get_cv_scores(LSTMModel, X_rnn_train, y_train, input_shape=input_shape)
+    print(f"{dataset_choice.upper()} LSTM CV: {lstm_cv['mean_accuracy']:.4f} (+/- {lstm_cv['std_accuracy']:.4f})")
     
     # ==================== TRAIN AND EVALUATE ====================
     print("\n" + "="*60)
@@ -41,66 +54,73 @@ def main():
     
     # RNN
     rnn = RNNModel(hidden_units=50, dropout=0.1)
-    rnn.build(input_shape=(1, 4), num_classes=3)
-    rnn_history = rnn.train(X_rnn, y, epochs=50, batch_size=10, validation_split=0.2)
-    rnn_metrics = rnn.evaluate(X_test_rnn, y_test)
+    rnn.build(input_shape=input_shape, num_classes=y_train.shape[1])
+    rnn_history = rnn.train(X_rnn_train, y_train, epochs=50, batch_size=min(32, X_rnn_train.shape[0]//4), validation_split=0.2)
+    rnn_metrics = rnn.evaluate(X_rnn_test, y_test)
     print_metrics("RNN", rnn_metrics)
-    plot_learning_curves(rnn_history, "RNN")
+    plot_learning_curves(rnn_history, f"{dataset_choice.upper()} RNN")
     
-    y_pred_rnn = np.argmax(rnn.predict(X_test_rnn), axis=1)
+    y_pred_rnn = np.argmax(rnn.predict(X_rnn_test), axis=1)
     y_test_labels = np.argmax(y_test, axis=1)
-    plot_confusion_matrix(y_test_labels, y_pred_rnn, "RNN")
+    plot_confusion_matrix(y_test_labels, y_pred_rnn, f"{dataset_choice.upper()} RNN")
     
     # LSTM
     lstm = LSTMModel(hidden_units=50, dropout=0.1)
-    lstm.build(input_shape=(1, 4), num_classes=3)
-    lstm_history = lstm.train(X_rnn, y, epochs=50, batch_size=10, validation_split=0.2)
-    lstm_metrics = lstm.evaluate(X_test_rnn, y_test)
+    lstm.build(input_shape=input_shape, num_classes=y_train.shape[1])
+    lstm_history = lstm.train(X_rnn_train, y_train, epochs=50, batch_size=min(32, X_rnn_train.shape[0]//4), validation_split=0.2)
+    lstm_metrics = lstm.evaluate(X_rnn_test, y_test)
     print_metrics("LSTM", lstm_metrics)
-    plot_learning_curves(lstm_history, "LSTM")
+    plot_learning_curves(lstm_history, f"{dataset_choice.upper()} LSTM")
     
-    y_pred_lstm = np.argmax(lstm.predict(X_test_rnn), axis=1)
-    plot_confusion_matrix(y_test_labels, y_pred_lstm, "LSTM")
+    y_pred_lstm = np.argmax(lstm.predict(X_rnn_test), axis=1)
+    plot_confusion_matrix(y_test_labels, y_pred_lstm, f"{dataset_choice.upper()} LSTM")
     
-    # GAN (no CV for GAN - complex)
+    # GAN - ENABLED FOR ALL DATASETS
     print("\n" + "="*60)
     print("Training GAN...")
     print("="*60)
     
-    gan = GAN(input_dim=4, generator_units=8, discriminator_units=8)
+    # Dynamic sizing based on dataset
+    gen_units = min(128, X_train.shape[1] * 16)
+    disc_units = min(128, X_train.shape[1] * 16)
+    gan_batch = min(32, X_train.shape[0] // 8)
+    
+    gan = GAN(input_dim=X_train.shape[1], generator_units=gen_units, discriminator_units=disc_units)
     gan.build_generator()
     gan.build_discriminator()
     gan.build_gan()
-    gan.train(X, epochs=100, batch_size=32)
+    gan.train(X_train, epochs=100, batch_size=gan_batch)
     
     generated = gan.generate_samples(X_test.shape[0])
     gan_X = np.concatenate((X_test, generated))
-    gan_y = np.concatenate((y_test.argmax(axis=1), y_test.argmax(axis=1)))
-    gan_y_onehot = np.eye(3)[gan_y]
+    gan_y = np.tile(np.argmax(y_test, axis=1), 2)
+    gan_y_onehot = encoder.transform(gan_y)
     
-    gan_classifier = GANClassifier(hidden_units=10)
-    gan_classifier.build(input_dim=4, num_classes=3)
-    gan_history = gan_classifier.train(gan_X, gan_y_onehot, epochs=50, batch_size=10)
+    gan_classifier = GANClassifier(hidden_units=min(64, X_train.shape[1] * 4))
+    gan_classifier.build(input_dim=X_train.shape[1], num_classes=y_train.shape[1])
+    gan_history = gan_classifier.train(gan_X, gan_y_onehot, epochs=50, batch_size=gan_batch)
     gan_metrics = gan_classifier.evaluate(X_test, y_test)
     print_metrics("GAN Classifier", gan_metrics)
-    plot_learning_curves(gan_history, "GAN Classifier")
+    plot_learning_curves(gan_history, f"{dataset_choice.upper()} GAN")
     
     y_pred_gan = np.argmax(gan_classifier.predict(X_test), axis=1)
-    plot_confusion_matrix(y_test_labels, y_pred_gan, "GAN Classifier")
+    plot_confusion_matrix(y_test_labels, y_pred_gan, f"{dataset_choice.upper()} GAN")
     
-    # Summary plot
+    # Final comparison plot
     all_metrics = [rnn_metrics, lstm_metrics, gan_metrics]
-    plot_metrics(['RNN', 'LSTM', 'GAN'], all_metrics)
+    plot_metrics(['RNN', 'LSTM', 'GAN'], all_metrics, f'{dataset_choice}_results.png')
     
-    print("\nCV and test results saved as PNG files. Task complete!")
+    print("\nCV, training, and test results saved as PNG files. Task complete!")
     
-    # Save models
-    rnn.save('models/rnn_model.keras')
-    lstm.save('models/lstm_model.keras')
-    gan.generator.save('models/gan_generator.keras')
-    gan.discriminator.save('models/gan_discriminator.keras')
-    gan_classifier.model.save('models/gan_classifier.keras')
-
+    # Create models directory and save
+    import os
+    os.makedirs(f'models/{dataset_choice}', exist_ok=True)
+    dataset_dir = f'models/{dataset_choice}'
+    rnn.save(f'{dataset_dir}/rnn_model.keras')
+    lstm.save(f'{dataset_dir}/lstm_model.keras')
+    gan.generator.save(f'{dataset_dir}/gan_generator.keras')
+    gan.discriminator.save(f'{dataset_dir}/gan_discriminator.keras')
+    gan_classifier.model.save(f'{dataset_dir}/gan_classifier.keras')
 
 if __name__ == "__main__":
     main()

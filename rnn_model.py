@@ -1,8 +1,9 @@
 """RNN model implementation with expanded functionality."""
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, SimpleRNN, Dropout
+from tensorflow.keras.layers import Dense, SimpleRNN, Dropout, Input
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -37,7 +38,8 @@ class RNNModel:
             self
         """
         self.model = Sequential([
-            SimpleRNN(self.hidden_units, activation='relu', input_shape=input_shape),
+            tf.keras.layers.Input(shape=input_shape),
+            SimpleRNN(self.hidden_units, activation='relu'),
         ])
         
         if self.dropout > 0:

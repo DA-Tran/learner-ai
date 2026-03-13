@@ -17,6 +17,7 @@ def get_cv_scores(model_class, X, y, input_shape, num_classes=3, cv_folds=5, epo
         y_train_fold, y_val_fold = y[train_idx], y[val_idx]
         
         # Build model
+        num_classes = y.shape[1] if y.ndim > 1 else len(np.unique(np.argmax(y, axis=1)))
         model = model_class(hidden_units=hidden_units)
         model.build(input_shape=input_shape, num_classes=num_classes)
         
