@@ -104,11 +104,14 @@ def train_single_dataset(dataset_name):
     }
 
 def main():
-    datasets = ['iris', 'heart', 'breast', 'wine']
+    datasets = ['iris', 'heart', 'breast', 'wine', 'phishing', 'mushroom']
     
     print("ML Pipeline v3.0")
     print("1. Single dataset")
     print("2. ALL datasets → 1 PNG summary")
+    
+    import time
+    start_time = time.time()
     
     choice = input("Enter (1/2): ").strip()
     
@@ -189,11 +192,41 @@ def main():
         print("\nDONE!")
         
     elif choice == '1':
-        dataset = input("Dataset (iris/heart/breast/wine): ").strip().lower()
-        if dataset in datasets:
-            train_single_dataset(dataset)
-        else:
-            print("Invalid dataset!")
+        while True:
+            dataset = input("Dataset (iris/heart/breast/wine/phishing/mushroom) or 'exit' to quit: ").strip().lower()
+            if dataset == 'exit':
+                print("👋 Goodbye!")
+                break
+            if dataset in datasets:
+                result = train_single_dataset(dataset)
+                # Single dataset PNG (2 panels)
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+                
+                # Test accuracies
+                models = ['RNN', 'LSTM', 'GAN']
+                test_accs = [result['rnn_test'], result['lstm_test'], result['gan_test']]
+                ax1.bar(models, test_accs, alpha=0.8, color=['red', 'blue', 'green'])
+                ax1.set_title(f'{dataset.upper()} Test Accuracy')
+                ax1.set_ylim(0, 1)
+                for i, v in enumerate(test_accs):
+                    ax1.text(i, v+0.01, f'{v:.3f}', ha='center', fontweight='bold')
+                
+                # CV accuracies (RNN/LSTM)
+                cv_models = ['RNN-CV', 'LSTM-CV']
+                cv_accs = [result['rnn_cv'], result['lstm_cv']]
+                ax2.bar(cv_models, cv_accs, alpha=0.8, color=['red', 'blue'])
+                ax2.set_title(f'{dataset.upper()} Cross-Validation')
+                ax2.set_ylim(0, 1)
+                for i, v in enumerate(cv_accs):
+                    ax2.text(i, v+0.01, f'{v:.3f}', ha='center', fontweight='bold')
+                
+                plt.suptitle(f'{dataset.upper()} Results Summary', fontsize=16)
+                plt.tight_layout()
+                plt.savefig(f'{dataset}_summary.png', dpi=300, bbox_inches='tight')
+                plt.show()
+                print(f"✅ {dataset}_summary.png saved")
+            else:
+                print("Invalid dataset! Please retype.")
     else:
         main()
 
