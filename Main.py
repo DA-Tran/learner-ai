@@ -24,7 +24,7 @@ tf.config.optimizer.set_jit(True)
 def train_single_dataset(dataset_name):
     """Train all models on single dataset. Return metrics only."""
     print("="*80)
-    print(f"🎯 PROCESSING {dataset_name.upper()}")
+    print(f"PROCESSING {dataset_name.upper()}")
     print("="*80)
     
     # Load data
@@ -43,7 +43,7 @@ def train_single_dataset(dataset_name):
     
     # Cross-validation
 
-    print("\n📊 CROSS-VALIDATION")
+    print("\nCROSS-VALIDATION")
     rnn_cv = get_cv_scores(RNNModel, X_rnn_train, y_train, input_shape=input_shape, is_binary=is_binary)
     lstm_cv = get_cv_scores(LSTMModel, X_rnn_train, y_train, input_shape=input_shape, is_binary=is_binary)
     
@@ -90,7 +90,7 @@ def train_single_dataset(dataset_name):
     gan_history = gan_classifier.train(gan_X, gan_y_onehot, epochs=30, validation_split=0.2)
     gan_metrics = gan_classifier.evaluate(X_test, y_test)
     
-    print(f"\n📈 {dataset_name.upper()} RESULTS:")
+    print(f"\n{dataset_name.upper()} RESULTS:")
     print(f"RNN: {rnn_metrics['accuracy']:.3f} | LSTM: {lstm_metrics['accuracy']:.3f} | GAN: {gan_metrics['accuracy']:.3f}")
     
     return {
@@ -115,14 +115,14 @@ def main():
     results_data = []
     
     if choice == '2':
-        print("\n🚀 RUNNING ALL...")
+        print("\nRUNNING ALL...")
         for dataset in datasets:
             try:
                 result = train_single_dataset(dataset)
                 results_data.append(result)
-                print(f"✅ {dataset.upper()} COMPLETE\n")
+                print(f"{dataset.upper()} COMPLETE\n")
             except Exception as e:
-                print(f"❌ {dataset}: {e}")
+                print(f"{dataset}: {e}")
         
         # Create 1 PNG with ALL results - handle partial failures
         successful_datasets = [r['dataset'] for r in results_data]
@@ -184,9 +184,9 @@ def main():
             plt.tight_layout()
             plt.savefig('ALL_RESULTS_SUMMARY.png', dpi=300, bbox_inches='tight')
             plt.show()
-            print("\n📊 SINGLE SUMMARY PNG: ALL_RESULTS_SUMMARY.png")
+            print("\nSINGLE SUMMARY PNG: ALL_RESULTS_SUMMARY.png")
         
-        print("\n🎉 DONE!")
+        print("\nDONE!")
         
     elif choice == '1':
         dataset = input("Dataset (iris/heart/breast/wine): ").strip().lower()

@@ -20,7 +20,7 @@ data_utils.py    - Loads UCI datasets (iris/heart/breast/wine)
 rnn_model.py     - RNN class
 lstm_model.py    - LSTM class
 gan_model.py     - GAN + classifier
-run_clean.sh     - Clean run script
+run_clean.sh     - Clean run script (might encounter performance warnings)
 ```
 
 ## How to Run
@@ -49,7 +49,3 @@ Multi-metric evaluation > accuracy alone
 **RNN**: Sequential data learning
 **LSTM**: Long-term memory
 **GAN**: Generative adversarial concepts
-
----
-
-*Learning deep learning fundamentals through comparison*

@@ -22,6 +22,6 @@ models/
 .DS_Store
 Thumbs.db
 
-# Images - don't commit PNGs
+# Images
 *.png
 **/*.png
