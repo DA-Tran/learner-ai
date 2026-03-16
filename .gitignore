@@ -5,9 +5,6 @@ __pycache__/
 
 # Venvs
 .venv/
-tf_venv/
-venv/
-ENV/
 
 # Models
 models/
@@ -24,3 +21,7 @@ models/
 # OS
 .DS_Store
 Thumbs.db
+
+# Images - don't commit PNGs
+*.png
+**/*.png

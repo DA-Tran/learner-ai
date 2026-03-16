@@ -1,9 +1,9 @@
-"""RNN model implementation with expanded functionality."""
+"""RNN model implementation with binary/multi-class support."""
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, SimpleRNN, Dropout, Input
+from tensorflow.keras.layers import Dense, SimpleRNN, Dropout
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -25,33 +25,41 @@ class RNNModel:
         self.learning_rate = learning_rate
         self.model = None
         self.history = None
-        
-    def build(self, input_shape, num_classes=3):
+    
+    def build(self, input_shape, num_classes=3, is_binary=False):
         """
-        Build the RNN model.
+        Build the RNN model with binary/multi-class support.
         
         Args:
             input_shape: Input shape (time_steps, features)
-            num_classes: Number of output classes
+            num_classes: Number of output classes (ignored if binary)
+            is_binary: If True, use sigmoid/binary_crossentropy
             
         Returns:
             self
         """
         self.model = Sequential([
             tf.keras.layers.Input(shape=input_shape),
-            SimpleRNN(self.hidden_units, activation='relu'),
+            SimpleRNN(self.hidden_units, activation='relu', return_sequences=False),
         ])
         
         if self.dropout > 0:
             self.model.add(Dropout(self.dropout))
             
-        self.model.add(Dense(num_classes, activation='softmax'))
-        
-        self.model.compile(
-            optimizer=Adam(learning_rate=self.learning_rate),
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
-        )
+        if is_binary:
+            self.model.add(Dense(1, activation='sigmoid'))
+            self.model.compile(
+                optimizer=Adam(learning_rate=self.learning_rate),
+                loss='binary_crossentropy',
+                metrics=['accuracy']
+            )
+        else:
+            self.model.add(Dense(num_classes, activation='softmax'))
+            self.model.compile(
+                optimizer=Adam(learning_rate=self.learning_rate),
+                loss='categorical_crossentropy',
+                metrics=['accuracy']
+            )
         
         return self
     
@@ -85,19 +93,26 @@ class RNNModel:
     
     def evaluate(self, X_test, y_test, verbose=0):
         """
-        Evaluate model performance with multiple metrics.
+        Evaluate model performance with binary/multi-class support.
         
         Args:
             X_test: Test features
-            y_test: Test labels (one-hot encoded)
+            y_test: Test labels (binary: 1D, multi: 2D)
             verbose: Verbosity level
             
         Returns:
             dict: Dictionary with accuracy, precision, recall, f1
         """
         y_pred = self.predict(X_test, verbose=verbose)
-        y_pred_labels = np.argmax(y_pred, axis=1)
-        y_test_labels = np.argmax(y_test, axis=1)
+        
+        if len(y_pred.shape) == 2 and y_pred.shape[1] == 1:
+            # Binary
+            y_pred_labels = (y_pred.flatten() > 0.5).astype(int)
+            y_test_labels = (y_test.flatten() > 0.5).astype(int) if len(y_test.shape) > 1 else y_test
+        else:
+            # Multi-class
+            y_pred_labels = np.argmax(y_pred, axis=1)
+            y_test_labels = np.argmax(y_test, axis=1) if len(y_test.shape) > 1 else y_test
         
         metrics = {
             'accuracy': accuracy_score(y_test_labels, y_pred_labels),
@@ -117,3 +132,4 @@ class RNNModel:
         """Print model summary."""
         if self.model:
             self.model.summary()
+

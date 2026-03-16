@@ -11,16 +11,20 @@ def print_metrics(model_name, metrics):
     print(f"  F1-Score:  {metrics['f1']:.4f}")
 
 def plot_metrics(model_names, metrics_list, filename='results.png'):
-    """Plot bar chart for model metrics."""
+    """Plot bar chart for model metrics - high granularity."""
     x = np.arange(len(model_names))
-    width = 0.2
+    width = 0.18
     
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(14, 8))
     metrics_keys = ['accuracy', 'precision', 'recall', 'f1']
     
     for i, key in enumerate(metrics_keys):
         values = [m[key] for m in metrics_list]
-        ax.bar(x + i*width, values, width, label=key.capitalize())
+        bars = ax.bar(x + i*width, values, width, label=key.capitalize(), alpha=0.8, edgecolor='black', linewidth=1.2)
+        # Add value labels on bars
+        for bar, v in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005, f'{v:.4f}', 
+                   ha='center', va='bottom', fontweight='bold', fontsize=10)
     
     ax.set_xlabel('Models')
     ax.set_ylabel('Scores')
@@ -39,13 +43,14 @@ def plot_learning_curves(history, model_name):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     
     # Loss
-    ax1.plot(history.history['loss'], label='Train Loss')
+    ax1.plot(history.history['loss'], label='Train Loss', linewidth=2)
     if 'val_loss' in history.history:
-        ax1.plot(history.history['val_loss'], label='Val Loss')
+        ax1.plot(history.history['val_loss'], label='Val Loss', linewidth=2)
     ax1.set_title(f'{model_name} - Loss')
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Loss')
     ax1.legend()
+    ax1.grid(True, alpha=0.3)
     
     # Accuracy
     ax2.plot(history.history['accuracy'], label='Train Acc')
