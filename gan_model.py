@@ -1,4 +1,4 @@
-"""GAN model implementation with binary/multi-class support."""
+"""GAN for data augmentation + classifier."""
 
 import numpy as np
 import tensorflow as tf
@@ -9,8 +9,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 
 class GAN:
-    """Generative Adversarial Network for data augmentation."""
-    
+    """GAN generator + discriminator."""
+
     def __init__(self, input_dim=4, generator_units=8, discriminator_units=8, learning_rate=0.0002):
         self.input_dim = input_dim
         self.generator_units = generator_units

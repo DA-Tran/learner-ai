@@ -1,4 +1,4 @@
-"""RNN model implementation with binary/multi-class support."""
+"""RNN classification model."""
 
 import numpy as np
 import tensorflow as tf
@@ -9,17 +9,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 
 class RNNModel:
-    """Simple RNN model for classification."""
+    """RNN for binary/multi-class classification."""
     
     def __init__(self, hidden_units=50, dropout=0.0, learning_rate=0.001):
-        """
-        Initialize RNN model.
-        
-        Args:
-            hidden_units: Number of RNN units
-            dropout: Dropout rate
-            learning_rate: Learning rate for optimizer
-        """
         self.hidden_units = hidden_units
         self.dropout = dropout
         self.learning_rate = learning_rate
