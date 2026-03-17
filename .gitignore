@@ -1,28 +1,10 @@
-# Byte-compiled / optimized / DLL files
+*.pyc
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Venvs
 .venv/
-
-# Models
-models/
-*.h5
-*.pkl
-
-# Env
 .env
-
-# IDE
-.vscode/
-.idea/
-
-# OS
 .DS_Store
-Thumbs.db
+.vscode/
+*.log
+TODO.md
+# TODO.md (personal tracking)
 
-# Images
-*.png
-**/*.png
-# TODO.md
