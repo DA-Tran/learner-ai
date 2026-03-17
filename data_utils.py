@@ -9,7 +9,7 @@ from ucimlrepo import fetch_ucirepo
 
 def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state=42):
     # Dataset configs: (UCI_ID, target_mode)
-    UCI_IDS = {'iris': None, 'heart': 45, 'breast': 15, 'wine': 186, 'phishing': 327, 'mushroom': 848}
+    UCI_IDS = {'iris': None, 'heart': 45, 'breast': 15, 'wine': 186, 'phishing': 327, 'mushroom': 848, 'gendername': 591}
     
     if dataset_name not in UCI_IDS:
         raise ValueError(f"Dataset must be one of {list(UCI_IDS.keys())}")
@@ -20,6 +20,8 @@ def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state
         y = iris.target
     else:
         dataset = fetch_ucirepo(id=UCI_IDS[dataset_name])
+        if dataset is None:
+            raise ValueError(f"UCI repo {UCI_IDS[dataset_name]} not found")
         X = dataset.data.features 
         y = dataset.data.targets 
         
@@ -29,8 +31,11 @@ def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state
             y = (y_numeric >= 6).astype(int)
         
         # Binary target (first col =1 legit vs phishing)
-        elif UCI_IDS[dataset_name] in [45,327]:
-            y = y.iloc[:, 0].fillna(0).eq(1).astype(int).values
+        elif UCI_IDS[dataset_name] in [45,327,591]:
+            if hasattr(y, 'iloc') and y is not None:
+                y = y.iloc[:, 0].fillna(0).eq(1).astype(int).values
+            else:
+                y = np.zeros(len(X))
         elif UCI_IDS[dataset_name] == 186:
             y = (y.iloc[:, 0].fillna(0) > 0).astype(int).values
         else:
@@ -66,8 +71,6 @@ def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state
         X, y, test_size=test_size, random_state=random_state, 
         stratify=y if len(np.unique(y)) > 1 else None
     )
-    
-    # Silent
     
     return X_train, X_test, y_train, y_test, scaler, encoder, is_binary
 

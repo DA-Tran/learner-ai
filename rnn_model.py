@@ -70,12 +70,14 @@ class RNNModel:
         Returns:
             history: Training history
         """
+        early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
         self.history = self.model.fit(
             X_train, y_train,
             epochs=epochs,
             batch_size=batch_size,
             validation_split=validation_split,
-            verbose=verbose
+            verbose=verbose,
+            callbacks=[early_stop]
         )
         return self.history
     

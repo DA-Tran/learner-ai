@@ -1,6 +1,6 @@
 # AI Learning Project
 
-A personal project created to understand how neural networks work. This explores three different deep learning models (RNN, LSTM, and GAN) applied to UCI datasets (iris, heart, breast, wine, phishing websites, secondary_mushroom).
+A personal project created to understand how neural networks work. This explores three different deep learning models (RNN, LSTM, and GAN) applied to UCI datasets (iris, heart, breast, wine, phishing websites, secondary_mushroom, gendername).
 
 ## What is This?
 
@@ -16,7 +16,7 @@ Trained on classification tasks comparing RNN/LSTM/GAN performance.
 
 ```
 Main.py          - Runs models + creates summary PNG
-data_utils.py    - Loads UCI datasets (iris/heart/breast/wine/phishing/mushroom)
+data_utils.py    - Loads UCI datasets (iris/heart/breast/wine/phishing/mushroom/gendername)
 rnn_model.py     - RNN class
 lstm_model.py    - LSTM class
 gan_model.py     - GAN + classifier

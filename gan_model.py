@@ -124,12 +124,14 @@ class GANClassifier:
         return self
     
     def train(self, X_train, y_train, epochs=50, batch_size=10, validation_split=0.2, verbose=0):
+        early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
         return self.model.fit(
             X_train, y_train,
             epochs=epochs,
             batch_size=batch_size,
             validation_split=validation_split,
-            verbose=verbose
+            verbose=verbose,
+            callbacks=[early_stop]
         )
     
     def predict(self, X_test, verbose=0):
