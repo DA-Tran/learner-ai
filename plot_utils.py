@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def plot_single_dataset_comparison(metrics, dataset_name):
-    """Plot accuracy & time for single dataset (LGBM, XGB, RNN, LSTM, GAN)."""
-    models = ['LGBM', 'XGB', 'RNN', 'LSTM', 'GAN']
+    """Plot accuracy & time for single dataset (RNN, LSTM, GAN, LGBM, XGB)."""
+    models = ['RNN', 'LSTM', 'GAN', 'LGBM', 'XGB']
     # Handle partial results (single model)
     model_keys = {
         'LGBM': ('lgbm_acc', 'lgbm_time'),
@@ -95,12 +95,12 @@ def plot_all_datasets_summary(results_data):
     n_datasets = len(results_data)
     
     # All 5 models acc
-    models = ['LGBM', 'XGB', 'RNN', 'LSTM', 'GAN']
-    lgbm_acc = [r['lgbm'] for r in results_data]
-    xgb_acc = [r['xgb'] for r in results_data]
+models = ['RNN', 'LSTM', 'GAN', 'LGBM', 'XGB']
     rnn_acc = [r['rnn'] for r in results_data]
     lstm_acc = [r['lstm'] for r in results_data]
     gan_acc = [r['gan'] for r in results_data]
+    lgbm_acc = [r['lgbm'] for r in results_data]
+    xgb_acc = [r['xgb'] for r in results_data]
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     

@@ -146,7 +146,8 @@ class GANClassifier:
         if len(y_pred.shape) == 2 and y_pred.shape[1] == 1:
             # Binary
             y_pred_labels = (y_pred.flatten() > 0.5).astype(int)
-            y_test_labels = (y_test.flatten() > 0.5).astype(int) if len(y_test.shape) > 1 else y_test
+            y_test_labels = y_test.flatten() if len(y_test.shape) > 1 else y_test
+            y_test_labels = (y_test_labels > 0.5).astype(int)
         else:
             # Multi-class
             y_pred_labels = np.argmax(y_pred, axis=1)

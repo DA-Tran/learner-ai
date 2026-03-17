@@ -106,7 +106,7 @@ def train_single_model(dataset_name, model_name):
         result['gan_test'] = gan_classifier.evaluate(X_test, y_test)['accuracy']
         result['gan_time'] = time.time() - start
     
-    print(f"    ✓ {model_name.upper()} {result[list(result.keys())[-1]]:.3f}")
+    print(f"      {model_name.upper()} {result[list(result.keys())[-1]]:.3f}")
     return result
 
 def train_single_dataset(dataset_name):
@@ -219,7 +219,7 @@ def train_single_dataset(dataset_name):
     print(f"    Test: {time.time() - gan_test_start:.2f}s")
     
     print(f"\n{dataset_name.upper()} RESULTS:")
-    print(f"RNN: {rnn_metrics['accuracy']:.3f} | LSTM: {lstm_metrics['accuracy']:.3f} | GAN: {gan_metrics['accuracy']:.3f}")
+print(f"RNN: {rnn_metrics['accuracy']:.3f} | LSTM: {lstm_metrics['accuracy']:.3f} | GAN: {gan_metrics['accuracy']:.3f} | LGBM: {lgbm_metrics['accuracy']:.3f} | XGB: {xgb_metrics['accuracy']:.3f}")
     
     return {
         'dataset': dataset_name,
@@ -241,7 +241,6 @@ def train_single_dataset(dataset_name):
 def main():
     datasets = ['iris', 'heart', 'breast', 'wine', 'phishing', 'mushroom', 'gendername']
     
-    print("ML Pipeline v3.0")
     print("1. Single dataset")
     print("2. ALL datasets → 1 PNG summary")
     
@@ -337,11 +336,11 @@ def main():
                 print("Invalid dataset!")
                 continue
             
-            models_input = input("Models ('all' or comma-separate e.g. 'lgbm,xgb,rnn'): ").strip().lower()
-            if 'all' in models_input:
-                models = ['lgbm', 'xgb', 'rnn', 'lstm', 'gan']
-            else:
-                models = [m.strip() for m in models_input.split(',') if m.strip()]
+            models_input = input("Models ('all' or comma-separate e.g. 'rnn,lstm'): ").strip().lower()
+    if 'all' in models_input:
+        models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
+    else:
+        models = [m.strip() for m in models_input.split(',') if m.strip()]
             
             # Train selected
             full_result = {'dataset': dataset_input, 'is_binary': False}
