@@ -14,6 +14,8 @@ from cross_validation import get_cv_scores
 import os
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import os
+os.environ['SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL'] = 'True'
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -79,6 +81,7 @@ def train_single_model(dataset_name, model_name):
         
     elif model_name == 'gan':
         gen_units = min(64, X_train.shape[1]*8)
+        gen_units = min(64, X_train.shape[1]*8)
         gan = GAN(input_dim=X_train.shape[1], generator_units=gen_units, discriminator_units=gen_units)
         gan.build_generator()
         gan.build_discriminator()
@@ -86,24 +89,21 @@ def train_single_model(dataset_name, model_name):
         gan.train(X_train, epochs=50, batch_size=min(32, X_train.shape[0]//10))
         
         generated = gan.generate_samples(X_test.shape[0])
-        gan_X = np.concatenate((X_test, generated), axis=0)
+        gan_X = np.concatenate((X_train, generated), axis=0)
         
-        if len(y_test.shape) == 1:
-            y_test_labels = y_test
-            gan_y = np.tile(y_test_labels, 2)
-            gan_y_onehot = encoder.transform(gan_y)
+        if len(y_train.shape) > 1:
+            y_train_sparse = np.argmax(y_train, axis=1)
+            y_test_sparse = np.argmax(y_test, axis=1)
         else:
-            y_test_labels = np.argmax(y_test, axis=1)
-            gan_y = np.tile(y_test_labels, 2)
-            gan_y_onehot = encoder.transform(gan_y)
-        
-        # Fix num_classes for iris (3 classes)
-        gan_num_classes = len(np.unique(all_labels))
+            y_train_sparse = y_train
+            y_test_sparse = y_test
+        gan_y = np.tile(y_train_sparse, 2)
+        gan_num_classes = len(np.unique(gan_y))
         gan_classifier = GANClassifier(hidden_units=min(32, X_train.shape[1]*2))
         gan_classifier.build(input_dim=X_train.shape[1], num_classes=gan_num_classes)
         start = time.time()
-        gan_classifier.train(gan_X, gan_y_onehot, epochs=30, verbose=0)
-        result['gan_test'] = gan_classifier.evaluate(X_test, y_test)['accuracy']
+        gan_classifier.train(gan_X, gan_y, epochs=30, verbose=0)
+        result['gan_test'] = gan_classifier.evaluate(X_test, y_test_sparse)['accuracy']
         result['gan_time'] = time.time() - start
     
     print(f"      {model_name.upper()} {result[list(result.keys())[-1]]:.3f}")
@@ -193,33 +193,24 @@ def train_single_dataset(dataset_name):
     gan.build_gan()
     gan.train(X_train, epochs=50, batch_size=min(32, X_train.shape[0]//10))
     
-    generated = gan.generate_samples(X_test.shape[0])
-    gan_X = np.concatenate((X_test, generated), axis=0)
+    generated = gan.generate_samples(X_train.shape[0])
+    gan_X = np.concatenate((X_train, generated), axis=0)
     
-    # Encoder transform only
-    if len(y_test.shape) == 1:
-        y_test_labels = y_test
-        gan_y = np.tile(y_test_labels, 2)
-        gan_y_onehot = encoder.transform(gan_y)
+    # GAN: y_train one-hot → sparse for sparse_categorical_crossentropy
+    # GAN classifier: one-hot → sparse
+    if len(y_train.shape) > 1:
+        y_train_sparse = np.argmax(y_train, axis=1)
+        y_test_sparse = np.argmax(y_test, axis=1)
     else:
-        y_test_labels = np.argmax(y_test, axis=1)
-        gan_y = np.tile(y_test_labels, 2)
-        gan_y_onehot = encoder.transform(gan_y)
-    
+        y_train_sparse = y_train
+        y_test_sparse = y_test
+    gan_y = np.tile(y_train_sparse, 2)
+    gan_num_classes = len(np.unique(np.concatenate([y_train_sparse, y_test_sparse])))
     gan_classifier = GANClassifier(hidden_units=min(32, X_train.shape[1]*2))
-    gan_classifier.build(input_dim=X_train.shape[1], num_classes=num_classes)
-    num_classes = 1 if is_binary else len(np.unique(all_labels))
-    gan_classifier.build(input_dim=X_train.shape[1], num_classes=num_classes)
-    print("  GAN:")
+    gan_classifier.build(input_dim=X_train.shape[1], num_classes=gan_num_classes)
     gan_start = time.time()
-    gan_history = gan_classifier.train(gan_X, gan_y_onehot, epochs=30, validation_split=0.2)
-    print(f"    Train: {time.time() - gan_start:.2f}s")
-    gan_test_start = time.time()
-    gan_metrics = gan_classifier.evaluate(X_test, y_test)
-    print(f"    Test: {time.time() - gan_test_start:.2f}s")
-    
-    print(f"\n{dataset_name.upper()} RESULTS:")
-print(f"RNN: {rnn_metrics['accuracy']:.3f} | LSTM: {lstm_metrics['accuracy']:.3f} | GAN: {gan_metrics['accuracy']:.3f} | LGBM: {lgbm_metrics['accuracy']:.3f} | XGB: {xgb_metrics['accuracy']:.3f}")
+    gan_history = gan_classifier.train(gan_X, gan_y, epochs=30, verbose=0, validation_split=0.2)
+    gan_metrics = gan_classifier.evaluate(X_test, y_test_sparse)
     
     return {
         'dataset': dataset_name,
@@ -233,9 +224,9 @@ print(f"RNN: {rnn_metrics['accuracy']:.3f} | LSTM: {lstm_metrics['accuracy']:.3f
         'xgb_acc': xgb_metrics['accuracy'],
         'lgbm_time': lgbm_time,
         'xgb_time': xgb_time,
-        'rnn_time': (time.time() - rnn_start) if 'rnn_start' in locals() else 0,
-        'lstm_time': (time.time() - lstm_start) if 'lstm_start' in locals() else 0,
-        'gan_time': (time.time() - gan_start) if 'gan_start' in locals() else 0
+        'rnn_time': rnn_train_time,
+        'lstm_time': time.time() - lstm_start,
+        'gan_time': time.time() - gan_start
     }
 
 def main():
@@ -336,11 +327,12 @@ def main():
                 print("Invalid dataset!")
                 continue
             
+
             models_input = input("Models ('all' or comma-separate e.g. 'rnn,lstm'): ").strip().lower()
-    if 'all' in models_input:
-        models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
-    else:
-        models = [m.strip() for m in models_input.split(',') if m.strip()]
+            if 'all' in models_input:
+                models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
+            else:
+                models = [m.strip() for m in models_input.split(',') if m.strip()]
             
             # Train selected
             full_result = {'dataset': dataset_input, 'is_binary': False}
@@ -352,9 +344,13 @@ def main():
             
             plot_single_dataset_comparison(full_result, dataset_input)
             print(f"{dataset_input}_comparison.png (models: {models})")
-    else:
-        main()
+
 
 if __name__ == "__main__":
-    main()
+    import time
+    overall_start_time = time.time()
+    try:
+        main()
+    finally:
+        print(f"time completed: {time.time() - overall_start_time:.2f}s")
 

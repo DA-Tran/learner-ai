@@ -6,7 +6,6 @@ __pycache__/
 .vscode/
 *.log
 TODO.md
-# TODO.md (personal tracking)
 
 *.h5
 *.pkl
@@ -25,4 +24,3 @@ Thumbs.db
 # Images
 *.png
 **/*.png
-TODO.md

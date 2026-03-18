@@ -9,7 +9,7 @@ from ucimlrepo import fetch_ucirepo
 
 def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state=42):
     # Dataset configs: (UCI_ID, target_mode)
-    UCI_IDS = {'iris': None, 'heart': 45, 'breast': 15, 'wine': 186, 'phishing': 327, 'mushroom': 848, 'gendername': 591}
+    UCI_IDS = {'iris': None, 'heart': 45, 'breast': 15, 'wine': 186, 'phishing': 327, 'mushroom': 73, 'gendername': 591}
     
     if dataset_name not in UCI_IDS:
         raise ValueError(f"Dataset must be one of {list(UCI_IDS.keys())}")
@@ -30,26 +30,38 @@ def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state
             y_numeric = y['quality'].fillna(y['quality'].median()).values
             y = (y_numeric >= 6).astype(int)
         
-        # Binary target (first col =1 legit vs phishing)
-        elif UCI_IDS[dataset_name] in [45,327,591]:
-            if hasattr(y, 'iloc') and y is not None:
-                y = y.iloc[:, 0].fillna(0).eq(1).astype(int).values
-            else:
-                y = np.zeros(len(X))
+        # Binary target (first col =1 legit vs phishing, gender)
+        if UCI_IDS[dataset_name] in [45, 327, 591]:
+            y = y.iloc[:, 0].fillna(0).eq(1).astype(int).values if hasattr(y, 'iloc') else np.zeros(len(X))
         elif UCI_IDS[dataset_name] == 186:
-            y = (y.iloc[:, 0].fillna(0) > 0).astype(int).values
+            if hasattr(y, 'iloc'):
+                y = (y.iloc[:, 0].fillna(0) > 0).astype(int).values
+            else:
+                y = (y > 0).astype(int)
+        elif UCI_IDS[dataset_name] == 73:  # Mushroom
+            if 'class' in y.columns:
+                y = (y['class'].map({'e': 0, 'p': 1}).fillna(0)).values
+            else:
+                y = y.iloc[:, 0].map({'e': 0, 'p': 1}).fillna(0).values if hasattr(y, 'iloc') else y.values.ravel()
         else:
             y = y.values.ravel()
         
         # Features: categorical → codes, numeric only
         X_processed = X.copy()
         for col in X_processed.columns:
-            if X_processed[col].dtype == 'object':
-                X_processed[col] = pd.Categorical(X_processed[col].fillna('missing')).codes
+            col_series = X_processed[col].fillna('missing')
+            if col_series.dtype == 'object':
+                X_processed[col] = pd.Categorical(col_series).codes.astype(float)
+            else:
+                X_processed[col] = pd.to_numeric(col_series, errors='coerce').fillna(0).astype(float)
         
         X_numeric = X_processed.select_dtypes([np.number]).fillna(0).values
         if X_numeric.shape[1] == 0:
-            raise ValueError("No numeric features!")
+            # All categorical - use encoded
+            print(f"Warning: No numeric features for {dataset_name}, using all encoded")
+            X_numeric = X_processed.astype(float).fillna(0).values
+            if X_numeric.shape[1] == 0:
+                raise ValueError("No features available!")
         
         X = X_numeric
     

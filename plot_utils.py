@@ -95,9 +95,9 @@ def plot_all_datasets_summary(results_data):
     n_datasets = len(results_data)
     
     # All 5 models acc
-models = ['RNN', 'LSTM', 'GAN', 'LGBM', 'XGB']
-    rnn_acc = [r['rnn'] for r in results_data]
-    lstm_acc = [r['lstm'] for r in results_data]
+    models = ['RNN', 'LSTM', 'GAN', 'LGBM', 'XGB']
+    rnn_acc = [r['rnn_test'] for r in results_data]
+    lstm_acc = [r['lstm_test'] for r in results_data]
     gan_acc = [r['gan'] for r in results_data]
     lgbm_acc = [r['lgbm'] for r in results_data]
     xgb_acc = [r['xgb'] for r in results_data]

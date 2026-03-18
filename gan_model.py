@@ -100,6 +100,7 @@ class GANClassifier:
         self.hidden_units = hidden_units
         self.learning_rate = learning_rate
         self.model = None
+        self.is_binary = None
     
     def build(self, input_dim, num_classes=3):
         self.model = Sequential([
@@ -107,7 +108,9 @@ class GANClassifier:
             Dense(self.hidden_units, activation='relu'),
         ])
         
-        if num_classes == 1:
+        self.is_binary = num_classes == 2
+        
+        if self.is_binary:
             self.model.add(Dense(1, activation='sigmoid'))
             self.model.compile(
                 optimizer=Adam(learning_rate=self.learning_rate),
@@ -118,7 +121,7 @@ class GANClassifier:
             self.model.add(Dense(num_classes, activation='softmax'))
             self.model.compile(
                 optimizer=Adam(learning_rate=self.learning_rate),
-                loss='categorical_crossentropy',
+                loss='sparse_categorical_crossentropy',
                 metrics=['accuracy']
             )
         return self
@@ -143,15 +146,14 @@ class GANClassifier:
         """
         y_pred = self.predict(X_test, verbose=verbose)
         
-        if len(y_pred.shape) == 2 and y_pred.shape[1] == 1:
+        if self.is_binary:
             # Binary
             y_pred_labels = (y_pred.flatten() > 0.5).astype(int)
-            y_test_labels = y_test.flatten() if len(y_test.shape) > 1 else y_test
-            y_test_labels = (y_test_labels > 0.5).astype(int)
+            y_test_labels = y_test if len(y_test.shape) == 1 else (y_test.flatten() > 0.5).astype(int)
         else:
             # Multi-class
             y_pred_labels = np.argmax(y_pred, axis=1)
-            y_test_labels = np.argmax(y_test, axis=1) if len(y_test.shape) > 1 else y_test
+            y_test_labels = y_test if len(y_test.shape) == 1 else np.argmax(y_test, axis=1)
             
         metrics = {
             'accuracy': accuracy_score(y_test_labels, y_pred_labels),
