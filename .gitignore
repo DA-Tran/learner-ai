@@ -1,3 +1,5 @@
+
+
 *.pyc
 __pycache__/
 .venv/
@@ -24,3 +26,11 @@ Thumbs.db
 # Images
 *.png
 **/*.png
+
+# Test outputs
+*_comparison.txt
+*_comparison.png
+ALL_RESULTS_SUMMARY.txt
+test_*.json
+test_suite_results.json
+*.txt

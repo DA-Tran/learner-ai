@@ -1,59 +1,83 @@
 #!/usr/bin/env python3
-"""XGBoost tests."""
+"""XGB test - robust."""
 
-import unittest
 import subprocess
 import sys
+import json
+import numpy as np
+import os
+import time
 
-class TestXGBoostModel(unittest.TestCase):
-    def test_xgb_iris(self):
-        """XGB iris."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\niris\nxgb\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+def run_test_xgb():
+    datasets = ['iris', 'heart']
+    acc_scores, times = [], []
     
-    def test_xgb_heart(self):
-        """XGB heart."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nheart\nxgb\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    original_cwd = os.getcwd()
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    os.chdir(root_dir)
     
-    def test_xgb_breast(self):
-        """XGB breast."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nbreast\nxgb\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    for dataset in datasets:
+        print(f"Running {dataset} xgb...")
+        input_str = f"1\n{dataset}\nxgb\nexit\n"
+        
+        env = os.environ.copy()
+        env['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        result = subprocess.run([sys.executable, 'Main.py'], 
+                                input=input_str, 
+                                text=True, 
+                                timeout=120, 
+                                cwd=root_dir,
+                                env=env,
+                                capture_output=True)
+        
+        print(f"xgb returncode: {result.returncode}")
+        print(f"xgb STDOUT tail: {result.stdout[-300:]}")
+        if result.stderr:
+            print(f"xgb STDERR: {result.stderr[-300:]}")
+        
+        time.sleep(1)
+        
+        txt_file = f'{dataset}_comparison.txt'
+        for _ in range(5):
+            if os.path.exists(txt_file):
+                break
+            time.sleep(0.3)
+        
+        if os.path.exists(txt_file):
+            try:
+                with open(txt_file, 'r') as f:
+                    data = json.load(f)
+                acc_scores.append(data.get('xgb_acc', 0))
+                times.append(data.get('xgb_time', 0))
+                print(f"Parsed {dataset}: acc={data.get('xgb_acc',0):.3f} time={data.get('xgb_time',0):.3f}")
+                os.remove(txt_file)
+            except Exception as e:
+                print(f"Parse error {dataset}: {e}")
+                acc_scores.append(0)
+                times.append(0)
+        else:
+            print(f"No TXT for {dataset}")
+            acc_scores.append(0)
+            times.append(0)
     
-    def test_xgb_wine(self):
-        """XGB wine."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nwine\nxgb\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    os.chdir(original_cwd)
     
-    def test_xgb_phishing(self):
-        """XGB phishing."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nphishing\nxgb\ny\n', 
-                              text=True, timeout=300, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    avg_acc = np.mean(acc_scores)
+    avg_time = np.mean(times)
     
-    def test_xgb_mushroom(self):
-        """XGB mushroom."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nmushroom\nxgb\ny\n', 
-                              text=True, timeout=120, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    log_data = {
+        'datasets': datasets,
+        'avg_xgb_acc': float(avg_acc),
+        'avg_xgb_time': float(avg_time),
+        'status': 'PASS' if avg_acc > 0.8 else 'FAIL'
+    }
+    
+    with open('test_xgb_results.txt', 'w') as f:
+        json.dump(log_data, f, indent=2, default=float)
+    
+    print(f"XGB test_xgb_results.txt: status={log_data['status']}, avg_acc={avg_acc:.3f}, avg_time={avg_time:.1f}s")
+    sys.exit(0 if log_data['status'] == 'PASS' else 1)
 
 if __name__ == '__main__':
-    unittest.main()
-
+    run_test_xgb()

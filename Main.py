@@ -1,3 +1,4 @@
+
 """Main ML model trainer."""
 
 import numpy as np
@@ -8,27 +9,27 @@ from lstm_model import LSTMModel
 from gan_model import GAN, GANClassifier
 from lightgbm_model import LightGBMModel
 from xgboost_model import XGBoostModel
-from pipeline import train_all_models
 from plot_utils import plot_single_dataset_comparison
 from cross_validation import get_cv_scores
 import os
 import tensorflow as tf
 import matplotlib.pyplot as plt
-import os
-os.environ['SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL'] = 'True'
-
+import json
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
-# TF setup - SILENT execution
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Fatal only
+# TF setup - SILENT
+os.environ['SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL'] = 'True'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 tf.random.set_seed(42)
 tf.config.optimizer.set_jit(True)
 
+datasets = ['iris', 'heart', 'breast', 'wine', 'phishing', 'mushroom', 'gendername']
+models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
+
 def train_single_model(dataset_name, model_name):
-    """Train single model. Returns dict with its metrics only."""
-    import time
     print(f"  {model_name.upper()}:")
     
     X_train, X_test, y_train, y_test, scaler, encoder, is_binary = load_and_preprocess_dataset(dataset_name)
@@ -42,11 +43,11 @@ def train_single_model(dataset_name, model_name):
     num_classes = 2 if is_binary else y_train.shape[1]
     
     result = {'dataset': dataset_name, 'is_binary': is_binary}
+    start = time.time()
     
     if model_name == 'lgbm':
         lgbm = LightGBMModel()
         lgbm.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
-        start = time.time()
         lgbm.train(X_train, y_train)
         result['lgbm_acc'] = lgbm.evaluate(X_test, y_test)['accuracy']
         result['lgbm_time'] = time.time() - start
@@ -54,7 +55,6 @@ def train_single_model(dataset_name, model_name):
     elif model_name == 'xgb':
         xgb = XGBoostModel()
         xgb.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
-        start = time.time()
         xgb.train(X_train, y_train)
         result['xgb_acc'] = xgb.evaluate(X_test, y_test)['accuracy']
         result['xgb_time'] = time.time() - start
@@ -64,7 +64,6 @@ def train_single_model(dataset_name, model_name):
         result['rnn_cv'] = rnn_cv['mean_accuracy']
         rnn = RNNModel(hidden_units=50, dropout=0.3)
         rnn.build(input_shape, num_classes, is_binary)
-        start = time.time()
         rnn.train(X_rnn_train, y_train, epochs=30, verbose=0)
         result['rnn_test'] = rnn.evaluate(X_rnn_test, y_test)['accuracy']
         result['rnn_time'] = time.time() - start
@@ -74,13 +73,11 @@ def train_single_model(dataset_name, model_name):
         result['lstm_cv'] = lstm_cv['mean_accuracy']
         lstm = LSTMModel(hidden_units=50, dropout=0.1)
         lstm.build(input_shape, num_classes, is_binary)
-        start = time.time()
         lstm.train(X_rnn_train, y_train, epochs=30, verbose=0)
         result['lstm_test'] = lstm.evaluate(X_rnn_test, y_test)['accuracy']
         result['lstm_time'] = time.time() - start
         
     elif model_name == 'gan':
-        gen_units = min(64, X_train.shape[1]*8)
         gen_units = min(64, X_train.shape[1]*8)
         gan = GAN(input_dim=X_train.shape[1], generator_units=gen_units, discriminator_units=gen_units)
         gan.build_generator()
@@ -101,224 +98,49 @@ def train_single_model(dataset_name, model_name):
         gan_num_classes = len(np.unique(gan_y))
         gan_classifier = GANClassifier(hidden_units=min(32, X_train.shape[1]*2))
         gan_classifier.build(input_dim=X_train.shape[1], num_classes=gan_num_classes)
-        start = time.time()
         gan_classifier.train(gan_X, gan_y, epochs=30, verbose=0)
         result['gan_test'] = gan_classifier.evaluate(X_test, y_test_sparse)['accuracy']
         result['gan_time'] = time.time() - start
     
-    print(f"      {model_name.upper()} {result[list(result.keys())[-1]]:.3f}")
+    print(f"      {model_name.upper()} done")
     return result
 
-def train_single_dataset(dataset_name):
-    """Train all models on single dataset. Return metrics only."""
-    import time
-    print("="*80)
-    print(f"PROCESSING {dataset_name.upper()}")
-    print("="*80)
-    
-    # Load data
-    X_train, X_test, y_train, y_test, scaler, encoder, is_binary = load_and_preprocess_dataset(dataset_name)
-
-    X_rnn_train, X_rnn_test = reshape_for_rnn(X_train, X_test)
-    
-    # Fix encoder for GAN - fit on all labels
-    all_labels = np.concatenate([
-        y_train.ravel() if len(y_train.shape) > 1 else y_train,
-        y_test.ravel() if len(y_test.shape) > 1 else y_test
-    ])
-    encoder.fit(all_labels)
-    
-    input_shape = (1, X_train.shape[1])
-    num_classes = 2 if is_binary else y_train.shape[1]
-    
-    # Cross-validation
-
-    print("\nCROSS-VALIDATION")
-    rnn_cv = get_cv_scores(RNNModel, X_rnn_train, y_train, input_shape=input_shape, is_binary=is_binary)
-    lstm_cv = get_cv_scores(LSTMModel, X_rnn_train, y_train, input_shape=input_shape, is_binary=is_binary)
-    # Tree models use flat data, no CV here (sklearn CV later)
-    
-    # Train TREE MODELS (flat data)
-    print("\nTREE MODELS")
-    lgbm = LightGBMModel()
-    lgbm.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
-    lgbm_start = time.time()
-    lgbm.train(X_train, y_train)
-    lgbm_time = time.time() - lgbm_start
-    lgbm_metrics = lgbm.evaluate(X_test, y_test)
-    print(f"  LightGBM: {lgbm_time:.2f}s Acc: {lgbm_metrics['accuracy']:.3f}")
-    
-    xgb = XGBoostModel()
-    xgb.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
-    xgb_start = time.time()
-    xgb.train(X_train, y_train)
-    xgb_time = time.time() - xgb_start
-    xgb_metrics = xgb.evaluate(X_test, y_test)
-    print(f"  XGBoost: {xgb_time:.2f}s Acc: {xgb_metrics['accuracy']:.3f}")
-    
-    # Train NN MODELS
-    print("\nNN MODELS")
-    rnn = RNNModel(hidden_units=50, dropout=0.3)
-    lstm = LSTMModel(hidden_units=50, dropout=0.1)
-    num_classes = 2 if is_binary else y_train.shape[1]
-    
-    rnn.build(input_shape=input_shape, num_classes=num_classes, is_binary=is_binary)
-    lstm.build(input_shape=input_shape, num_classes=num_classes, is_binary=is_binary)
-    
-    print("  RNN:")
-    rnn_start = time.time()
-    rnn_history = rnn.train(X_rnn_train, y_train, epochs=30, validation_split=0.2, verbose=0)
-    rnn_train_time = time.time() - rnn_start
-    print(f"    Train: {rnn_train_time:.2f}s")
-    rnn_test_start = time.time()
-    rnn_metrics = rnn.evaluate(X_rnn_test, y_test)
-    print(f"    Test: {time.time() - rnn_test_start:.2f}s")
-    print("  LSTM:")
-    lstm_start = time.time()
-    lstm_history = lstm.train(X_rnn_train, y_train, epochs=30, validation_split=0.2, verbose=0)
-    print(f"    Train: {time.time() - lstm_start:.2f}s")
-    lstm_test_start = time.time()
-    lstm_metrics = lstm.evaluate(X_rnn_test, y_test)
-    print(f"    Test: {time.time() - lstm_test_start:.2f}s")
-    
-    rnn_metrics = rnn.evaluate(X_rnn_test, y_test)
-    lstm_metrics = lstm.evaluate(X_rnn_test, y_test)
-    
-    # GAN
-    print("\nGAN TRAINING")
-    gen_units = min(64, X_train.shape[1]*8)
-    gan = GAN(input_dim=X_train.shape[1], generator_units=gen_units, discriminator_units=gen_units)
-    gan.build_generator()
-    gan.build_discriminator()
-    gan.build_gan()
-    gan.train(X_train, epochs=50, batch_size=min(32, X_train.shape[0]//10))
-    
-    generated = gan.generate_samples(X_train.shape[0])
-    gan_X = np.concatenate((X_train, generated), axis=0)
-    
-    # GAN: y_train one-hot → sparse for sparse_categorical_crossentropy
-    # GAN classifier: one-hot → sparse
-    if len(y_train.shape) > 1:
-        y_train_sparse = np.argmax(y_train, axis=1)
-        y_test_sparse = np.argmax(y_test, axis=1)
-    else:
-        y_train_sparse = y_train
-        y_test_sparse = y_test
-    gan_y = np.tile(y_train_sparse, 2)
-    gan_num_classes = len(np.unique(np.concatenate([y_train_sparse, y_test_sparse])))
-    gan_classifier = GANClassifier(hidden_units=min(32, X_train.shape[1]*2))
-    gan_classifier.build(input_dim=X_train.shape[1], num_classes=gan_num_classes)
-    gan_start = time.time()
-    gan_history = gan_classifier.train(gan_X, gan_y, epochs=30, verbose=0, validation_split=0.2)
-    gan_metrics = gan_classifier.evaluate(X_test, y_test_sparse)
-    
-    return {
-        'dataset': dataset_name,
-        'is_binary': is_binary,
-        'rnn_cv': rnn_cv['mean_accuracy'],
-        'lstm_cv': lstm_cv['mean_accuracy'],
-        'rnn_test': rnn_metrics['accuracy'],
-        'lstm_test': lstm_metrics['accuracy'],
-        'gan_test': gan_metrics['accuracy'],
-        'lgbm_acc': lgbm_metrics['accuracy'],
-        'xgb_acc': xgb_metrics['accuracy'],
-        'lgbm_time': lgbm_time,
-        'xgb_time': xgb_time,
-        'rnn_time': rnn_train_time,
-        'lstm_time': time.time() - lstm_start,
-        'gan_time': time.time() - gan_start
-    }
-
 def main():
-    datasets = ['iris', 'heart', 'breast', 'wine', 'phishing', 'mushroom', 'gendername']
-    
     print("1. Single dataset")
-    print("2. ALL datasets → 1 PNG summary")
+    print("2. ALL datasets -> ALL_RESULTS_SUMMARY.txt")
     
-    import time
-    overall_start_time = time.time()
+    overall_start = time.time()
     
-    choice = input("Enter (1/2): ").strip()
-    
-    results_data = []
+    try:
+        choice = input("Enter (1/2): ").strip()
+    except:
+        choice = '1'
     
     if choice == '2':
-        print("\nRUNNING ALL...")
+        results_data = []
         for dataset in datasets:
-            try:
-                result = train_single_dataset(dataset)
-                results_data.append(result)
-                print(f"{dataset.upper()} COMPLETE\n")
-            except Exception as e:
-                print(f"{dataset}: {e}")
+            print(f"\n{'='*80}")
+            print(f"DATASET: {dataset.upper()} - ALL MODELS {models}")
+            print(f"{'='*80}")
+            
+            full_result = {'dataset': dataset}
+            for model in models:
+                result = train_single_model(dataset, model)
+                full_result.update(result)
+            
+            with open(f'{dataset}_comparison.txt', 'w') as f:
+                json.dump(full_result, f, indent=4)
+            results_data.append(full_result)
+            print(f"{dataset} ALL MODELS COMPLETE")
         
-        # Create 1 PNG with ALL results - handle partial failures
-        successful_datasets = [r['dataset'] for r in results_data]
-        if results_data:
-            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-            
-            # 1. Accuracy test bar
-            n_datasets = len(results_data)
-            x = np.arange(n_datasets)
-            width = 0.25
-            rnn_acc = [r['rnn_test'] for r in results_data]
-            lstm_acc = [r['lstm_test'] for r in results_data]
-            gan_acc = [r['gan_test'] for r in results_data]
-            ax1.bar(x - width, rnn_acc, width, label='RNN', alpha=0.8)
-            ax1.bar(x, lstm_acc, width, label='LSTM', alpha=0.8)
-            ax1.bar(x + width, gan_acc, width, label='GAN', alpha=0.8)
-            ax1.set_title('Test Accuracy by Model')
-            ax1.set_xticks(x)
-            ax1.set_xticklabels(successful_datasets)
-            ax1.legend()
-            ax1.set_ylim(0, 1)
-            
-            # 2. CV Accuracy
-
-            n_datasets = len(results_data)
-            rnn_cv = [r['rnn_cv'] for r in results_data]
-            lstm_cv = [r['lstm_cv'] for r in results_data]
-            x2 = np.arange(n_datasets)
-            width_cv = 0.4
-            ax2.bar(x2 - width_cv/2, rnn_cv, width_cv, label='RNN CV', alpha=0.8)
-            ax2.bar(x2 + width_cv/2, lstm_cv, width_cv, label='LSTM CV', alpha=0.8)
-            ax2.set_title('Cross-Validation Accuracy')
-            ax2.set_xticks(x2)
-            ax2.set_xticklabels(successful_datasets)
-
-            ax2.legend()
-            ax2.set_ylim(0, 1)
-            
-            # 3. Average per model
-            avg_rnn = np.mean(rnn_acc)
-            avg_lstm = np.mean(lstm_acc)
-            avg_gan = np.mean(gan_acc)
-            ax3.bar(['RNN', 'LSTM', 'GAN'], [avg_rnn, avg_lstm, avg_gan], alpha=0.8, color=['red', 'blue', 'green'])
-            ax3.set_title('Average Test Accuracy')
-            ax3.set_ylim(0, 1)
-            for i, v in enumerate([avg_rnn, avg_lstm, avg_gan]):
-                ax3.text(i, v + 0.01, f'{v:.3f}', ha='center', fontweight='bold')
-            
-            # 4. Dataset performance overview
-
-            dataset_acc = [ (r['rnn_test'] + r['lstm_test'] + r['gan_test'])/3 for r in results_data ]
-            ax4.bar(successful_datasets, dataset_acc, alpha=0.8, color='orange')
-
-            ax4.set_title('Average Accuracy per Dataset')
-            ax4.set_ylim(0, 1)
-            for i, v in enumerate(dataset_acc):
-                ax4.text(i, v + 0.01, f'{v:.3f}', ha='center', fontweight='bold')
-            
-            plt.tight_layout()
-            plt.savefig('ALL_RESULTS_SUMMARY.png', dpi=300, bbox_inches='tight')
-            plt.show()
-            print("\nSINGLE SUMMARY PNG: ALL_RESULTS_SUMMARY.png")
-        
-        print("\nDONE!")
-        
-    elif choice == '1':
+        with open('ALL_RESULTS_SUMMARY.txt', 'w') as f:
+            json.dump(results_data, f, indent=4)
+        print("ALL_RESULTS_SUMMARY.txt saved")
+    
+    else:
+        datasets_str = 'iris/heart/breast/wine/phishing/mushroom/gendername'
+        print("\nAvailable: lgbm, xgb, rnn, lstm, gan (comma-separate)")
         while True:
-            print("\nAvailable: lgbm, xgb, rnn, lstm, gan (comma-separate)")
             dataset_input = input("Dataset (iris/heart/breast/wine/phishing/mushroom/gendername) or 'exit': ").strip()
             if dataset_input == 'exit':
                 print("Goodbye!")
@@ -327,30 +149,28 @@ def main():
                 print("Invalid dataset!")
                 continue
             
-
             models_input = input("Models ('all' or comma-separate e.g. 'rnn,lstm'): ").strip().lower()
             if 'all' in models_input:
-                models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
+                sel_models = models
             else:
-                models = [m.strip() for m in models_input.split(',') if m.strip()]
+                sel_models = [m.strip() for m in models_input.split(',') if m.strip()]
             
-            # Train selected
-            full_result = {'dataset': dataset_input, 'is_binary': False}
-            for model_name in models:
+            full_result = {'dataset': dataset_input}
+            for model_name in sel_models:
                 result = train_single_model(dataset_input, model_name)
-                # Merge metrics
-                for k, v in result.items():
-                    full_result[k] = v
+                full_result.update({k: v for k, v in result.items() if k not in full_result})
             
-            plot_single_dataset_comparison(full_result, dataset_input)
-            print(f"{dataset_input}_comparison.png (models: {models})")
+            with open(f'{dataset_input}_comparison.txt', 'w') as f:
+                json.dump(full_result, f, indent=4)
+            # Test mode - only txt/JSON, no PNG
+            if os.getenv('TEST_MODE') != '1':
+                plot_single_dataset_comparison(full_result, dataset_input)
+                print(f"{dataset_input}_comparison.png saved (models: {sel_models})")
+            else:
+            print(f"{dataset_input}_comparison.txt saved (test mode)")
+    
+    print(f"time completed: {time.time() - overall_start:.2f}s")
 
-
-if __name__ == "__main__":
-    import time
-    overall_start_time = time.time()
-    try:
-        main()
-    finally:
-        print(f"time completed: {time.time() - overall_start_time:.2f}s")
+if __name__ == '__main__':
+    main()
 

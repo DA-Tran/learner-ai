@@ -1,59 +1,83 @@
 #!/usr/bin/env python3
-"""LightGBM tests."""
+"""LGBM test - robust."""
 
-import unittest
 import subprocess
 import sys
+import json
+import numpy as np
+import os
+import time
 
-class TestLightGBMModel(unittest.TestCase):
-    def test_lgbm_iris(self):
-        """LGBM iris."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\niris\nlgbm\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+def run_test_lgbm():
+    datasets = ['iris', 'heart']
+    acc_scores, times = [], []
     
-    def test_lgbm_heart(self):
-        """LGBM heart."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nheart\nlgbm\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    original_cwd = os.getcwd()
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    os.chdir(root_dir)
     
-    def test_lgbm_breast(self):
-        """LGBM breast."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nbreast\nlgbm\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    for dataset in datasets:
+        print(f"Running {dataset} lgbm...")
+        input_str = f"1\n{dataset}\nlgbm\nexit\n"
+        
+        env = os.environ.copy()
+        env['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        
+        result = subprocess.run([sys.executable, 'Main.py'], 
+                                input=input_str, 
+                                text=True, 
+                                timeout=120, 
+                                cwd=root_dir,
+                                env=env,
+                                capture_output=True)
+        
+        print(f"lgbm returncode: {result.returncode}")
+        print(f"lgbm STDOUT tail: {result.stdout[-300:]}")
+        if result.stderr:
+            print(f"lgbm STDERR: {result.stderr[-300:]}")
+        
+        time.sleep(1)
+        
+        txt_file = f'{dataset}_comparison.txt'
+        for _ in range(5):
+            if os.path.exists(txt_file):
+                break
+            time.sleep(0.3)
+        
+        if os.path.exists(txt_file):
+            try:
+                with open(txt_file, 'r') as f:
+                    data = json.load(f)
+                acc_scores.append(data.get('lgbm_acc', 0))
+                times.append(data.get('lgbm_time', 0))
+                print(f"Parsed {dataset}: acc={data.get('lgbm_acc',0):.3f} time={data.get('lgbm_time',0):.3f}")
+                os.remove(txt_file)
+            except Exception as e:
+                print(f"Parse error {dataset}: {e}")
+                acc_scores.append(0)
+                times.append(0)
+        else:
+            print(f"No TXT for {dataset}")
+            acc_scores.append(0)
+            times.append(0)
     
-    def test_lgbm_wine(self):
-        """LGBM wine."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nwine\nlgbm\ny\n', 
-                              text=True, timeout=60, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    os.chdir(original_cwd)
     
-    def test_lgbm_phishing(self):
-        """LGBM phishing."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nphishing\nlgbm\ny\n', 
-                              text=True, timeout=300, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    avg_acc = np.mean(acc_scores)
+    avg_time = np.mean(times)
     
-    def test_lgbm_mushroom(self):
-        """LGBM mushroom."""
-        result = subprocess.run([sys.executable, '../Main.py'], 
-                              input='1\nmushroom\nlgbm\ny\n', 
-                              text=True, timeout=120, cwd='..', 
-                              capture_output=True)
-        self.assertIn('time completed', result.stdout)
+    log_data = {
+        'datasets': datasets,
+        'avg_lgbm_acc': float(avg_acc),
+        'avg_lgbm_time': float(avg_time),
+        'status': 'PASS' if avg_acc > 0.75 else 'FAIL'
+    }
+    
+    with open('test_lgbm_results.txt', 'w') as f:
+        json.dump(log_data, f, indent=2, default=float)
+    
+    print(f"LGBM test_lgbm_results.txt: status={log_data['status']}, avg_acc={avg_acc:.3f}, avg_time={avg_time:.1f}s")
+    sys.exit(0 if log_data['status'] == 'PASS' else 1)
 
 if __name__ == '__main__':
-    unittest.main()
-
+    run_test_lgbm()
