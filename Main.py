@@ -3,11 +3,11 @@
 import numpy as np
 import pandas as pd
 from data_utils import load_and_preprocess_dataset, reshape_for_rnn
-from rnn_model import RNNModel
-from lstm_model import LSTMModel
-from gan_model import GAN, GANClassifier
-from lightgbm_model import LightGBMModel
-from xgboost_model import XGBoostModel
+from predictive_ai.rnn_model import RNNModel
+from predictive_ai.lstm_model import LSTMModel
+from predictive_ai.lightgbm_model import LightGBMModel
+from predictive_ai.xgboost_model import XGBoostModel
+from generative_ai.gan_model import GAN, GANClassifier
 from plot_utils import plot_single_dataset_comparison
 from cross_validation import get_cv_scores
 import os

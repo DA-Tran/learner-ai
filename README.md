@@ -30,19 +30,23 @@ pip install tensorflow scikit-learn lightgbm xgboost
 ##  Structure
 
 ```
-├── Main.py              # Core: model training + interactive CLI
-├── data_utils.py        # UCI datasets (iris/heart/breast/wine + large)
+├── Main.py              # Core: model training + interactive CLI + model saving
+├── data_utils.py        # UCI datasets (iris/heart/breast/wine + large), RobustScaler
 ├── rnn_model.py         # RNN implementation
 ├── lstm_model.py        # LSTM with CV
-├── gan_model.py         # GAN generator + classifier
+├── gan_model.py         # GAN generator + classifier (saves .keras)
 ├── lightgbm_model.py    # LGBM baseline
 ├── xgboost_model.py     # XGB baseline
-├── tests/run_all_tests.py # Time-based tests (iris/heart/breast/wine <660s)
-├── run_clean.sh         # Clean interactive launcher
-├── run_ml_suite.sh      # Full ML pipeline
+├── models/              # Saved models (.keras/.h5 per dataset/model)
+│   ├── iris/rnn_model.keras
+│   ├── heart/gan_generator.keras
+│   └── ...
+├── tests/run_all_tests.py # Time-based tests (iris/heart/breast/wine <660s total)
+├── run_clean.sh         # Interactive launcher (per-model timing)
+├── run_ml_suite.sh      # Full ML pipeline + clean
 ├── plot_utils.py        # Dynamic comparison PNGs
 ├── TODO.md              # Progress tracking
-└── results/             # *_comparison.png + JSON
+└── results/             # *_comparison.png + JSON summaries
 ```
 
 ##  Models Implemented
