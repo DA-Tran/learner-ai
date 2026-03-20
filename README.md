@@ -59,7 +59,7 @@ pip install tensorflow scikit-learn lightgbm xgboost
 
 **Small (quick)**: iris (4 feats), heart/breast/wine (binary/multi-class)  
 **Medium**: phishing, mushroom  
-**Large**: gendername (1M+ rows, RobustScaler)
+**Large**: gendername (500k rows)
 
 ##  Features
 
