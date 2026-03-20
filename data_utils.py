@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.datasets import load_iris
-from sklearn.preprocessing import StandardScaler, LabelBinarizer, LabelEncoder
+from sklearn.preprocessing import RobustScaler, LabelBinarizer, LabelEncoder
 from sklearn.model_selection import train_test_split
 from ucimlrepo import fetch_ucirepo
 
@@ -57,15 +57,17 @@ def load_and_preprocess_dataset(dataset_name='iris', test_size=0.2, random_state
         
         X_numeric = X_processed.select_dtypes([np.number]).fillna(0).values
         if X_numeric.shape[1] == 0:
-            # All categorical - use encoded
-            print(f"Warning: No numeric features for {dataset_name}, using all encoded")
-            X_numeric = X_processed.astype(float).fillna(0).values
-            if X_numeric.shape[1] == 0:
-                raise ValueError("No features available!")
-        
+            print(f"Warning: All categorical for {dataset_name}")
+            X_numeric = X_processed.fillna(0).values.astype(float)
+        # Clamp extreme values
+        X_numeric = np.nan_to_num(X_numeric, nan=0.0, posinf=1e6, neginf=-1e6)
         X = X_numeric
     
-    scaler = StandardScaler()
+# Robust scaling (handles inf/nan/1M+ rows)
+    scaler = RobustScaler()
+    X_clean = np.nan_to_num(X, nan=0, posinf=1e9, neginf=-1e9)
+    q_low, q_high = np.percentile(X_clean, [1, 99])
+    X = np.clip(X_clean, q_low, q_high)
     X = scaler.fit_transform(X)
     
     # Encode labels

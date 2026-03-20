@@ -1,4 +1,3 @@
-
 """Main ML model trainer."""
 
 import numpy as np
@@ -43,21 +42,23 @@ def train_single_model(dataset_name, model_name):
     num_classes = 2 if is_binary else y_train.shape[1]
     
     result = {'dataset': dataset_name, 'is_binary': is_binary}
-    start = time.time()
+    model_start = time.time()
     
     if model_name == 'lgbm':
         lgbm = LightGBMModel()
         lgbm.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
         lgbm.train(X_train, y_train)
         result['lgbm_acc'] = lgbm.evaluate(X_test, y_test)['accuracy']
-        result['lgbm_time'] = time.time() - start
+        result['lgbm_time'] = time.time() - model_start
+        print(f"time completed: {result['lgbm_time']:.2f}s")
         
     elif model_name == 'xgb':
         xgb = XGBoostModel()
         xgb.build(input_dim=X_train.shape[1], num_classes=num_classes, is_binary=is_binary)
         xgb.train(X_train, y_train)
         result['xgb_acc'] = xgb.evaluate(X_test, y_test)['accuracy']
-        result['xgb_time'] = time.time() - start
+        result['xgb_time'] = time.time() - model_start
+        print(f"time completed: {result['xgb_time']:.2f}s")
         
     elif model_name == 'rnn':
         rnn_cv = get_cv_scores(RNNModel, X_rnn_train, y_train, input_shape, is_binary=is_binary)
@@ -66,7 +67,8 @@ def train_single_model(dataset_name, model_name):
         rnn.build(input_shape, num_classes, is_binary)
         rnn.train(X_rnn_train, y_train, epochs=30, verbose=0)
         result['rnn_test'] = rnn.evaluate(X_rnn_test, y_test)['accuracy']
-        result['rnn_time'] = time.time() - start
+        result['rnn_time'] = time.time() - model_start
+        print(f"time completed: {result['rnn_time']:.2f}s")
         
     elif model_name == 'lstm':
         lstm_cv = get_cv_scores(LSTMModel, X_rnn_train, y_train, input_shape, is_binary=is_binary)
@@ -75,7 +77,8 @@ def train_single_model(dataset_name, model_name):
         lstm.build(input_shape, num_classes, is_binary)
         lstm.train(X_rnn_train, y_train, epochs=30, verbose=0)
         result['lstm_test'] = lstm.evaluate(X_rnn_test, y_test)['accuracy']
-        result['lstm_time'] = time.time() - start
+        result['lstm_time'] = time.time() - model_start
+        print(f"time completed: {result['lstm_time']:.2f}s")
         
     elif model_name == 'gan':
         gen_units = min(64, X_train.shape[1]*8)
@@ -100,12 +103,54 @@ def train_single_model(dataset_name, model_name):
         gan_classifier.build(input_dim=X_train.shape[1], num_classes=gan_num_classes)
         gan_classifier.train(gan_X, gan_y, epochs=30, verbose=0)
         result['gan_test'] = gan_classifier.evaluate(X_test, y_test_sparse)['accuracy']
-        result['gan_time'] = time.time() - start
+        result['gan_time'] = time.time() - model_start
+        print(f"time completed: {result['gan_time']:.2f}s")
     
     print(f"      {model_name.upper()} done")
     return result
 
 def main():
+    print("Mode:")
+    print("1. User mode")
+    print("2. Testing mode")
+    
+    mode_choice = input("Enter (1/2): ").strip()
+    
+    if mode_choice == '2':
+        print("\nTesting:")
+        print("1. Specific model test")
+        print("2. All testcases")
+        
+        test_choice = input("Enter (1/2): ").strip()
+        
+        os.environ['TEST_MODE'] = '1'
+        
+        if test_choice == '1':
+            model = input("Model (rnn/lstm/gan/lgbm/xgb): ").strip()
+            dataset = input("Dataset: ").strip()
+            result = train_single_model(dataset, model)
+            os.makedirs('tests', exist_ok=True)
+            with open(f'tests/test_{dataset}_{model}.json', 'w') as f:
+                json.dump(result, f, indent=4)
+            print(f"Test complete: tests/test_{dataset}_{model}.json")
+        
+        elif test_choice == '2':
+            datasets_test = ['iris', 'heart', 'breast', 'wine']
+            results = []
+            for dataset in datasets_test:
+                print(f"\nTesting ALL MODELS on {dataset}")
+                full_result = {'dataset': dataset}
+                for model in models:
+                    result = train_single_model(dataset, model)
+                    full_result[model] = result
+                results.append(full_result)
+            
+            os.makedirs('tests', exist_ok=True)
+            with open('tests/test_all_suite.json', 'w') as f:
+                json.dump(results, f, indent=4)
+            print("Full test suite: tests/test_all_suite.json")
+    
+    # User mode
     print("1. Single dataset")
     print("2. ALL datasets -> ALL_RESULTS_SUMMARY.txt")
     
@@ -128,12 +173,14 @@ def main():
                 result = train_single_model(dataset, model)
                 full_result.update(result)
             
-            with open(f'{dataset}_comparison.txt', 'w') as f:
+            os.makedirs('results', exist_ok=True)
+            with open(f'results/{dataset}_comparison.txt', 'w') as f:
                 json.dump(full_result, f, indent=4)
             results_data.append(full_result)
             print(f"{dataset} ALL MODELS COMPLETE")
         
-        with open('ALL_RESULTS_SUMMARY.txt', 'w') as f:
+        os.makedirs('results', exist_ok=True)
+        with open('results/ALL_RESULTS_SUMMARY.txt', 'w') as f:
             json.dump(results_data, f, indent=4)
         print("ALL_RESULTS_SUMMARY.txt saved")
     
@@ -160,14 +207,15 @@ def main():
                 result = train_single_model(dataset_input, model_name)
                 full_result.update({k: v for k, v in result.items() if k not in full_result})
             
-            with open(f'{dataset_input}_comparison.txt', 'w') as f:
+            os.makedirs('results', exist_ok=True)
+            with open(f'results/{dataset_input}_comparison.txt', 'w') as f:
                 json.dump(full_result, f, indent=4)
             # Test mode - only txt/JSON, no PNG
             if os.getenv('TEST_MODE') != '1':
                 plot_single_dataset_comparison(full_result, dataset_input)
-                print(f"{dataset_input}_comparison.png saved (models: {sel_models})")
+                print(f"results/{dataset_input}_comparison.png saved (models: {sel_models})")
             else:
-            print(f"{dataset_input}_comparison.txt saved (test mode)")
+                print(f"results/{dataset_input}_comparison.txt saved (test mode)")
     
     print(f"time completed: {time.time() - overall_start:.2f}s")
 
