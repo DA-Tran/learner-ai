@@ -8,6 +8,11 @@ from predictive_ai.lstm_model import LSTMModel
 from predictive_ai.lightgbm_model import LightGBMModel
 from predictive_ai.xgboost_model import XGBoostModel
 from generative_ai.gan_model import GAN, GANClassifier
+from generative_ai.vae_model import VAEClassifier
+from generative_ai.dcgan_model import DCGAN, DCGANClassifier
+from generative_ai.cgan_model import CGAN, CGANClassifier
+from generative_ai.ctgan_model import CTGANModel
+from generative_ai.diffusion_model import TabDDPM
 from plot_utils import plot_single_dataset_comparison
 from cross_validation import get_cv_scores
 import os
@@ -26,7 +31,9 @@ tf.random.set_seed(42)
 tf.config.optimizer.set_jit(True)
 
 datasets = ['iris', 'heart', 'breast', 'wine', 'phishing', 'mushroom', 'gendername']
-models = ['rnn', 'lstm', 'gan', 'lgbm', 'xgb']
+predictive_models = ['rnn', 'lstm', 'lgbm', 'xgb']
+generative_models = ['gan', 'vae', 'dcgan', 'cgan', 'ctgan', 'diffusion']
+all_models = predictive_models + generative_models
 
 def train_single_model(dataset_name, model_name):
     print(f"  {model_name.upper()}:")
@@ -95,8 +102,8 @@ def train_single_model(dataset_name, model_name):
             y_train_sparse = np.argmax(y_train, axis=1)
             y_test_sparse = np.argmax(y_test, axis=1)
         else:
-            y_train_sparse = y_train
-            y_test_sparse = y_test
+            y_train_sparse = y_train.ravel()
+            y_test_sparse = y_test.ravel()
         gan_y = np.tile(y_train_sparse, 2)
         gan_num_classes = len(np.unique(gan_y))
         gan_classifier = GANClassifier(hidden_units=min(32, X_train.shape[1]*2))
@@ -105,6 +112,74 @@ def train_single_model(dataset_name, model_name):
         result['gan_test'] = gan_classifier.evaluate(X_test, y_test_sparse)['accuracy']
         result['gan_time'] = time.time() - model_start
         print(f"time completed: {result['gan_time']:.2f}s")
+    elif model_name == 'vae':
+        vae = VAEClassifier()
+        vae.build(X_train.shape[1], num_classes, is_binary)
+        vae.train(X_train)
+        result['vae_acc'] = vae.evaluate(X_test, y_test)['accuracy']
+        result['vae_time'] = time.time() - model_start
+        print(f"time completed: {result['vae_time']:.2f}s")
+    elif model_name == 'dcgan':
+        dcgan = DCGAN(X_train.shape[1])
+        dcgan.build_generator()
+        dcgan.build_discriminator()
+        dcgan.build_gan()
+        dcgan.train(X_train)
+        classifier = DCGANClassifier(X_train.shape[1])
+        classifier.build(X_train.shape[1], num_classes)
+        if 'y_train_sparse' not in locals():
+            y_train_sparse = np.argmax(y_train, axis=1) if len(y_train.shape) > 1 else y_train.ravel()
+            y_test_sparse = np.argmax(y_test, axis=1) if len(y_test.shape) > 1 else y_test.ravel()
+        generated = dcgan.generate_samples(X_test.shape[0])
+        X_combined = np.concatenate([X_train, generated])
+        y_combined = np.tile(y_train_sparse, 2)
+        classifier.train(X_combined, y_combined)
+        result['dcgan_acc'] = classifier.evaluate(X_test, y_test_sparse)['accuracy']
+        result['dcgan_time'] = time.time() - model_start
+        print(f"time completed: {result['dcgan_time']:.2f}s")
+    elif model_name == 'cgan':
+        if len(y_train.shape) > 1:
+            y_train_sparse = np.argmax(y_train, axis=1)
+            y_test_sparse = np.argmax(y_test, axis=1)
+        else:
+            y_train_sparse = y_train.ravel()
+            y_test_sparse = y_test.ravel()
+        cgan = CGAN(X_train.shape[1], len(np.unique(y_train_sparse)))
+        cgan.build()
+        cgan.train(X_train, y_train_sparse)
+        classifier = CGANClassifier(X_train.shape[1])
+        classifier.build(X_train.shape[1], len(np.unique(y_train_sparse)))
+        # Balanced generation per class
+        unique_classes = np.unique(y_train_sparse)
+        n_per_class = X_train.shape[0] // len(unique_classes)
+        all_generated = []
+        all_y_generated = []
+        for cls in unique_classes:
+            gen = cgan.generate_samples(n_per_class, cls.numpy() if hasattr(cls, 'numpy') else cls)
+            all_generated.append(gen)
+            all_y_generated.append(np.full(n_per_class, cls))
+        generated = np.vstack(all_generated)
+        y_generated = np.hstack(all_y_generated)
+        X_combined = np.vstack([X_train, generated])
+        y_combined = np.hstack([y_train_sparse, y_generated])
+        classifier.train(X_combined, y_combined)
+        result['cgan_acc'] = classifier.evaluate(X_test, y_test_sparse)['accuracy']
+        result['cgan_time'] = time.time() - model_start
+        print(f"time completed: {result['cgan_time']:.2f}s")
+    elif model_name == 'ctgan':
+        ctgan = CTGANModel()
+        ctgan.build(X_train.shape[1], num_classes, is_binary)
+        ctgan.train(X_train)
+        result['ctgan_acc'] = ctgan.evaluate(X_test, y_test)['accuracy']
+        result['ctgan_time'] = time.time() - model_start
+        print(f"time completed: {result['ctgan_time']:.2f}s")
+    elif model_name == 'diffusion':
+        diffusion = TabDDPM(X_train.shape[1])
+        diffusion.build(X_train.shape[1], num_classes, is_binary)
+        diffusion.train(X_train)
+        result['diffusion_acc'] = diffusion.evaluate(X_test, y_test)['accuracy']
+        result['diffusion_time'] = time.time() - model_start
+        print(f"time completed: {result['diffusion_time']:.2f}s")
     
     print(f"      {model_name.upper()} done")
     return result
@@ -119,7 +194,9 @@ def main():
     if mode_choice == '2':
         print("\nTesting:")
         print("1. Specific model test")
-        print("2. All testcases")
+        print("2. All predictive models")
+        print("3. All generative models")
+        print("4. All testcases")
         
         test_choice = input("Enter (1/2): ").strip()
         
@@ -140,7 +217,7 @@ def main():
             for dataset in datasets_test:
                 print(f"\nTesting ALL MODELS on {dataset}")
                 full_result = {'dataset': dataset}
-                for model in models:
+                for model in all_models:
                     result = train_single_model(dataset, model)
                     full_result[model] = result
                 results.append(full_result)
@@ -165,11 +242,11 @@ def main():
         results_data = []
         for dataset in datasets:
             print(f"\n{'='*80}")
-            print(f"DATASET: {dataset.upper()} - ALL MODELS {models}")
+            print(f"DATASET: {dataset.upper()} - ALL MODELS {all_models}")
             print(f"{'='*80}")
             
             full_result = {'dataset': dataset}
-            for model in models:
+            for model in all_models:
                 result = train_single_model(dataset, model)
                 full_result.update(result)
             
@@ -186,7 +263,7 @@ def main():
     
     else:
         datasets_str = 'iris/heart/breast/wine/phishing/mushroom/gendername'
-        print("\nAvailable: lgbm, xgb, rnn, lstm, gan (comma-separate)")
+        print("\nAvailable: lgbm, xgb, rnn, lstm, gan, vae, dcgan, cgan, ctgan, diffusion (comma-separate)")
         while True:
             dataset_input = input("Dataset (iris/heart/breast/wine/phishing/mushroom/gendername) or 'exit': ").strip()
             if dataset_input == 'exit':
@@ -198,7 +275,7 @@ def main():
             
             models_input = input("Models ('all' or comma-separate e.g. 'rnn,lstm'): ").strip().lower()
             if 'all' in models_input:
-                sel_models = models
+                sel_models = all_models
             else:
                 sel_models = [m.strip() for m in models_input.split(',') if m.strip()]
             

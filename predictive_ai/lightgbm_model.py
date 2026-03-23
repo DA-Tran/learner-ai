@@ -31,12 +31,17 @@ class LightGBMModel:
         return self
     
     def train(self, X_train, y_train):
-        """Train model. Input: flat arrays (not RNN-shaped)."""
         # Flatten y if onehot
         if len(y_train.shape) > 1 and y_train.shape[1] > 1:
             y_train_flat = np.argmax(y_train, axis=1)
         else:
             y_train_flat = y_train.flatten()
+        
+        unique_classes = np.unique(y_train_flat)
+        if len(unique_classes) < 2:
+            print('LightGBM skipping: single class in train data')
+            self.model = None
+            return self
         
         self.model.fit(X_train, y_train_flat)
         return self

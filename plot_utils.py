@@ -6,12 +6,20 @@ def plot_single_dataset_comparison(metrics, dataset_name):
     """Plot accuracy & time for single dataset (RNN, LSTM, GAN, LGBM, XGB)."""
     models = ['RNN', 'LSTM', 'GAN', 'LGBM', 'XGB']
     # Handle partial results (single model)
+    generative_keys = {
+        'VAE': ('vae_acc', 'vae_time'),
+        'DCGAN': ('dcgan_acc', 'dcgan_time'),
+        'CGAN': ('cgan_acc', 'cgan_time'),
+        'CTGAN': ('ctgan_acc', 'ctgan_time'),
+        'DIFFUSION': ('diffusion_acc', 'diffusion_time')
+    }
     model_keys = {
         'LGBM': ('lgbm_acc', 'lgbm_time'),
         'XGB': ('xgb_acc', 'xgb_time'),
         'RNN': ('rnn_test', 'rnn_time'),
         'LSTM': ('lstm_test', 'lstm_time'),
-        'GAN': ('gan_test', 'gan_time')
+        'GAN': ('gan_test', 'gan_time'),
+        **generative_keys
     }
     accs = [metrics.get(acc_key, None) for acc_key, _ in model_keys.values()]
     times = [metrics.get(time_key, None) for _, time_key in model_keys.values()]
@@ -43,7 +51,7 @@ def plot_single_dataset_comparison(metrics, dataset_name):
         ax3.text(0.5, 0.5, 'No NN CV\n(Tree models)', ha='center', va='center', transform=ax3.transAxes)
         ax3.set_title('Cross-Validation')
     
-    colors = ['green', 'blue', 'red', 'orange', 'purple']
+    colors = ['purple', 'brown', 'pink', 'gray', 'olive', 'cyan', 'magenta', 'yellow', 'lime', 'navy']
     
     # Accuracy
     # Filter None for bar heights
@@ -79,7 +87,7 @@ def plot_single_dataset_comparison(metrics, dataset_name):
         ax2.text(0.5, 0.5, 'No timing data', ha='center', va='center', transform=ax2.transAxes)
         ax2.set_title('Training Time')
     
-    plt.suptitle(f'{dataset_name.upper()} - 5 Models Comparison', fontsize=16, y=1.02)
+    plt.suptitle(f'{dataset_name.upper()} - Model Comparison ({len([k for k in model_keys if metrics.get(k[0][0].lower(), None)])} Models)', fontsize=16, y=1.02)
     plt.tight_layout()
     plt.savefig(f'{dataset_name}_comparison.png', dpi=300, bbox_inches='tight')
     plt.show()
