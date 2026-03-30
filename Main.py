@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from data_utils import load_and_preprocess_dataset, reshape_for_rnn
+from backend.data_utils import load_and_preprocess_dataset, reshape_for_rnn
 from predictive_ai.rnn_model import RNNModel
 from predictive_ai.lstm_model import LSTMModel
 from predictive_ai.lightgbm_model import LightGBMModel
@@ -13,8 +13,8 @@ from generative_ai.dcgan_model import DCGAN, DCGANClassifier
 from generative_ai.cgan_model import CGAN, CGANClassifier
 from generative_ai.ctgan_model import CTGANModel
 from generative_ai.diffusion_model import TabDDPM
-from plot_utils import plot_single_dataset_comparison
-from cross_validation import get_cv_scores
+from backend.plot_utils import plot_single_dataset_comparison
+from backend.cross_validation import get_cv_scores
 import os
 import tensorflow as tf
 import matplotlib.pyplot as plt
